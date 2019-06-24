@@ -1,0 +1,148 @@
+public class FilterQuerys
+	{
+		public static string CreateFilterExpression(List<QuerysAttribute> querysAttributes, string filterRequest)
+		{
+			if (filterRequest == null) filterRequest = string.Empty;
+			var filterResult = string.Empty;
+			var filters = filterRequest.Split('&');
+
+			foreach (var fItem in filters)
+			{
+				try
+				{
+					var queryItem = string.Empty;
+					var fields = fItem.Trim().Split('=');
+					if (querysAttributes.Any(x => x.NameRequest.Equals(fields[0])))
+					{
+						var queryAtt = querysAttributes.First(x => x.NameRequest.Equals(fields[0]));
+						if (queryAtt.TypeField == typeof(string))
+							queryItem = GetQueryString(queryAtt, fields[1]);
+
+						if (queryAtt.TypeField == typeof(DateTime))
+							queryItem = GetQueryDatetime(queryAtt, fields[1]);
+
+						if (queryAtt.TypeField == typeof(DateTime?))
+							queryItem = GetQueryDatetimeNullable(queryAtt, fields[1]);
+					}
+
+					if (!string.IsNullOrEmpty(queryItem))
+					{
+						if (filterResult != string.Empty)
+							filterResult = filterResult + " AND " + queryItem;
+						else
+							filterResult = queryItem;
+					}
+
+				}
+				catch (Exception ex)
+				{
+					var erro = ex.Message;
+				}
+
+			}
+			return filterResult;
+		}
+
+		public static string CreateFieldsExpression(List<QuerysAttribute> querysAttributes, string fieldsRequest)
+		{
+			if (fieldsRequest == null) fieldsRequest = string.Empty;
+			var fieldsResult = string.Empty;
+			var fields = fieldsRequest.Split(',');
+
+			foreach (var fItem in fields)
+			{
+				try
+				{
+					if (querysAttributes.Any(x => x.CanSpecify && x.NameRequest.Equals(fItem)))
+					{
+						if (fieldsResult != string.Empty)
+							fieldsResult = fieldsResult + " , " + fItem;
+						else
+							fieldsResult = fItem;
+					}
+				}
+				catch (Exception ex)
+				{
+					var erro = ex.Message;
+				}
+
+			}
+			return fieldsResult;
+		}
+
+		private static string GetQueryString(QuerysAttribute querysAttribute, string valueFilter)
+		{
+			valueFilter = valueFilter.Replace(@"""", "");
+			return $@"({querysAttribute.NameSelect} == ""{valueFilter}"")";
+		}
+
+		private static string GetQueryDatetime(QuerysAttribute querysAttribute, string valueFilter)
+		{
+			var filter = string.Empty;
+			if (!valueFilter.Contains("["))
+			{
+				DateTime dtFilter;
+				if (DateTime.TryParse(valueFilter, out dtFilter))
+				{
+					filter = $@"({querysAttribute.NameSelect} == ""{dtFilter.ToString("yyyy-MM-dd")})""";
+				}
+			}
+			else
+			{
+				try
+				{
+					valueFilter = valueFilter.Replace("[", "").Replace("]", "");
+					DateTime dtFilter1;
+					DateTime dtFilter2;
+					if (DateTime.TryParse(valueFilter.Split(',')[0], out dtFilter1) && DateTime.TryParse(valueFilter.Split(',')[1], out dtFilter2))
+					{
+						filter = $@"({querysAttribute.NameSelect} >= ""{dtFilter1.ToString("yyyy-MM-dd")}"" AND {querysAttribute.NameSelect} <= ""{dtFilter2.ToString("yyyy-MM-dd")}"")";
+					}
+				}
+				catch
+				{
+					filter = string.Empty;
+				}
+			}
+			return filter;
+		}
+
+		private static string GetQueryDatetimeNullable(QuerysAttribute querysAttribute, string valueFilter)
+		{
+			var filter = string.Empty;
+			if (!valueFilter.Contains("["))
+			{
+				DateTime dtFilter;
+				if (DateTime.TryParse(valueFilter, out dtFilter))
+				{
+					filter = $@"({querysAttribute.NameSelect}.HasValue AND {querysAttribute.NameSelect}.Value == ""{dtFilter.ToString("yyyy-MM-dd")}"")";
+				}
+			}
+			else
+			{
+				try
+				{
+					valueFilter = valueFilter.Replace("[", "").Replace("]", "");
+					DateTime dtFilter1;
+					DateTime dtFilter2;
+					if (DateTime.TryParse(valueFilter.Split(',')[0], out dtFilter1) && DateTime.TryParse(valueFilter.Split(',')[1], out dtFilter2))
+					{
+						filter = $@"({querysAttribute.NameSelect}.HasValue AND {querysAttribute.NameSelect} > ""{dtFilter1.ToString("yyyy-MM-dd")}"" AND {querysAttribute.NameSelect} < ""{dtFilter2.ToString("yyyy-MM-dd")}"" )";
+					}
+				}
+				catch
+				{
+					filter = string.Empty;
+				}
+			}
+			return filter;
+		}
+	}
+
+private Expression<Func<Certificate, bool>> GetExpressionFilter(string expressionFilter)
+{
+	var expParsed = DynamicExpressionParser.ParseLambda<Certificate, bool>((new ParsingConfig()), true, expressionFilter);// (new[] { parameterExp }, typeof(Func<Produto, bool>), exp);
+	return expParsed;
+}
+
+//System.Linq.Dynamic.Core
